@@ -55,7 +55,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   historico: any[] = [];
   mostrarHistorico = false;
   
-  // Gráficas (últimas 15 lecturas)
+  // Gráficas
   chartDataTemp: any;
   chartDataHum: any;
   chartOptions: any;
@@ -67,8 +67,13 @@ export class DashboardComponent implements OnInit, OnDestroy {
   private intervalo: any;
   private ultimoTimestamp: string = '';
   
+  // 🆕 Contador regresivo
+  nextReadingIn: number = 0;
+  private countdownInterval: any;
+  
   private apiUrl = 'https://servidor-esp.onrender.com/api/data';
   private statsUrl = 'https://servidor-esp.onrender.com/api/stats';
+  private updateUrl = 'https://servidor-esp.onrender.com/api/update';
 
   constructor(
     private http: HttpClient,
@@ -77,7 +82,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
-    // Cargar usuario
     const userData = localStorage.getItem('user');
     if (userData) {
       this.usuario = JSON.parse(userData);
@@ -86,8 +90,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.configurarGraficas();
     this.cargarDatos();
     this.cargarEstadisticas();
+    this.iniciarContadorRegresivo();
     
-    // Polling inteligente: revisar cada 2 segundos si hay datos NUEVOS
+    // Polling cada 2 segundos
     this.intervalo = setInterval(() => {
       this.verificarNuevosDatos();
     }, 2000);
@@ -97,6 +102,38 @@ export class DashboardComponent implements OnInit, OnDestroy {
     if (this.intervalo) {
       clearInterval(this.intervalo);
     }
+    if (this.countdownInterval) {
+      clearInterval(this.countdownInterval);
+    }
+  }
+
+  // 🆕 Iniciar contador regresivo
+  iniciarContadorRegresivo() {
+    // Obtener el intervalo aleatorio del backend
+    this.http.get<any>(this.updateUrl).subscribe({
+      next: (res) => {
+        this.nextReadingIn = res.interval_seconds;
+        
+        // Actualizar cada segundo
+        if (this.countdownInterval) {
+          clearInterval(this.countdownInterval);
+        }
+        
+        this.countdownInterval = setInterval(() => {
+          if (this.nextReadingIn > 0) {
+            this.nextReadingIn--;
+          } else {
+            // Cuando llega a 0, consultar de nuevo el intervalo
+            this.iniciarContadorRegresivo();
+          }
+        }, 1000);
+      },
+      error: (err) => {
+        console.error('Error al obtener intervalo:', err);
+        // Si falla, usar un valor por defecto de 30 segundos
+        this.nextReadingIn = 30;
+      }
+    });
   }
 
   getHeaders(): HttpHeaders {
@@ -128,21 +165,21 @@ export class DashboardComponent implements OnInit, OnDestroy {
     };
   }
 
-  // 🆕 Verificar si hay datos NUEVOS (solo actualiza si el timestamp cambió)
   verificarNuevosDatos() {
     this.http.get<any[]>(this.apiUrl, { headers: this.getHeaders() }).subscribe({
       next: (res) => {
         if (res && res.length > 0) {
           const ultimoDato = res[0];
           
-          // Solo actualizar si el timestamp es diferente
           if (ultimoDato.timestamp !== this.ultimoTimestamp) {
             console.log('🆕 NUEVO DATO DETECTADO:', ultimoDato.timestamp);
             this.ultimoTimestamp = ultimoDato.timestamp;
             this.actualizarDatos(res);
             this.cargarEstadisticas();
             
-            // Notificar
+            // 🆕 Reiniciar contador cuando llega dato nuevo
+            this.iniciarContadorRegresivo();
+            
             this.messageService.add({
               severity: 'success',
               summary: 'Datos Actualizados',
@@ -179,18 +216,15 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   actualizarDatos(datos: any[]) {
     const ultimo = datos[0];
-    
-    // Filtrar datos válidos (ignorar -99)
     const datosValidos = datos.filter(d => d.temperature > -90 && d.humidity > -90);
     
-    // Si el último dato es -99, mostrar el último válido
     if (ultimo.temperature === -99) {
       const ultimoValido = datosValidos[0];
       if (ultimoValido) {
         this.temperatura = ultimoValido.temperature;
         this.humedad = ultimoValido.humidity;
         this.voltaje = ultimoValido.voltage.toFixed(2);
-        this.online = false; // Sensor desconectado
+        this.online = false;
       }
     } else {
       this.temperatura = ultimo.temperature;
@@ -201,8 +235,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
     
     this.ultimaActualizacion = this.formatearFecha(ultimo.timestamp);
     this.totalLecturas = datos.length;
-    
-    // Actualizar gráficas con últimos 15 datos válidos
     this.actualizarGraficas(datosValidos.slice(0, 15).reverse());
   }
 

@@ -30,6 +30,10 @@
       <i class="pi pi-clock"></i>
       {{ ultimaActualizacion }}
     </span>
+    <span class="next-reading" *ngIf="nextReadingIn > 0">
+      <i class="pi pi-refresh"></i>
+      Siguiente lectura en: <strong>{{ nextReadingIn }}s</strong>
+    </span>
   </div>
 
   <!-- Main Cards -->

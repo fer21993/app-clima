@@ -69,6 +69,20 @@
   color: #6b7280;
 }
 
+.next-reading {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: #7c3aed;
+  margin-left: auto;
+}
+
+.next-reading strong {
+  color: #a855f7;
+  font-weight: 600;
+}
+
 /* ========== CARDS ========== */
 .cards {
   display: grid;
