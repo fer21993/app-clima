@@ -67,13 +67,13 @@ export class DashboardComponent implements OnInit, OnDestroy {
   private intervalo: any;
   private ultimoTimestamp: string = '';
   
-  // 🆕 Contador regresivo
+  // Contador regresivo SINCRONIZADO
   nextReadingIn: number = 0;
   private countdownInterval: any;
+  private timestampInicio: number = 0;
   
   private apiUrl = 'https://servidor-esp.onrender.com/api/data';
   private statsUrl = 'https://servidor-esp.onrender.com/api/stats';
-  private updateUrl = 'https://servidor-esp.onrender.com/api/update';
 
   constructor(
     private http: HttpClient,
@@ -90,7 +90,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.configurarGraficas();
     this.cargarDatos();
     this.cargarEstadisticas();
-    this.iniciarContadorRegresivo();
     
     // Polling cada 2 segundos
     this.intervalo = setInterval(() => {
@@ -107,33 +106,30 @@ export class DashboardComponent implements OnInit, OnDestroy {
     }
   }
 
-  // 🆕 Iniciar contador regresivo
-  iniciarContadorRegresivo() {
-    // Obtener el intervalo aleatorio del backend
-    this.http.get<any>(this.updateUrl).subscribe({
-      next: (res) => {
-        this.nextReadingIn = res.interval_seconds;
-        
-        // Actualizar cada segundo
-        if (this.countdownInterval) {
-          clearInterval(this.countdownInterval);
-        }
-        
-        this.countdownInterval = setInterval(() => {
-          if (this.nextReadingIn > 0) {
-            this.nextReadingIn--;
-          } else {
-            // Cuando llega a 0, consultar de nuevo el intervalo
-            this.iniciarContadorRegresivo();
-          }
-        }, 1000);
-      },
-      error: (err) => {
-        console.error('Error al obtener intervalo:', err);
-        // Si falla, usar un valor por defecto de 30 segundos
-        this.nextReadingIn = 30;
+  // Iniciar contador con el valor que viene del ESP32
+  iniciarContadorDesdeDato(segundos: number) {
+    console.log(`⏰ INICIANDO CONTADOR: ${segundos} segundos`);
+    this.nextReadingIn = segundos;
+    this.timestampInicio = Date.now();
+    
+    // Limpiar intervalo anterior si existe
+    if (this.countdownInterval) {
+      clearInterval(this.countdownInterval);
+    }
+    
+    // Actualizar cada segundo
+    this.countdownInterval = setInterval(() => {
+      const transcurrido = Math.floor((Date.now() - this.timestampInicio) / 1000);
+      const restante = segundos - transcurrido;
+      
+      if (restante > 0) {
+        this.nextReadingIn = restante;
+        console.log(`⏳ Contador: ${this.nextReadingIn}s`);
+      } else {
+        this.nextReadingIn = 0;
+        console.log('⏰ Contador llegó a 0, esperando nuevo dato...');
       }
-    });
+    }, 1000);
   }
 
   getHeaders(): HttpHeaders {
@@ -173,12 +169,22 @@ export class DashboardComponent implements OnInit, OnDestroy {
           
           if (ultimoDato.timestamp !== this.ultimoTimestamp) {
             console.log('🆕 NUEVO DATO DETECTADO:', ultimoDato.timestamp);
+            console.log('📦 Dato completo:', ultimoDato);
+            
             this.ultimoTimestamp = ultimoDato.timestamp;
             this.actualizarDatos(res);
             this.cargarEstadisticas();
             
-            // 🆕 Reiniciar contador cuando llega dato nuevo
-            this.iniciarContadorRegresivo();
+            // SINCRONIZAR contador con el valor que envió el ESP32
+            if (ultimoDato.next_reading_in !== undefined && ultimoDato.next_reading_in !== null && ultimoDato.next_reading_in > 0) {
+              console.log(`✅ ESP32 envió next_reading_in: ${ultimoDato.next_reading_in}s`);
+              this.iniciarContadorDesdeDato(ultimoDato.next_reading_in);
+            } else {
+              console.warn('⚠️ ESP32 NO envió next_reading_in válido:', ultimoDato.next_reading_in);
+              console.warn('🔍 Claves del objeto:', Object.keys(ultimoDato));
+              // Fallback: usar 30s por defecto
+              this.iniciarContadorDesdeDato(30);
+            }
             
             this.messageService.add({
               severity: 'success',
@@ -190,6 +196,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
         }
       },
       error: (err) => {
+        console.error('❌ Error al obtener datos:', err);
         if (err.status === 401) {
           this.router.navigate(['/login']);
         }
@@ -201,8 +208,17 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.http.get<any[]>(this.apiUrl, { headers: this.getHeaders() }).subscribe({
       next: (res) => {
         if (res && res.length > 0) {
+          console.log('📥 Datos iniciales cargados:', res[0]);
           this.ultimoTimestamp = res[0].timestamp;
           this.actualizarDatos(res);
+          
+          // Iniciar contador con el último dato guardado
+          if (res[0].next_reading_in && res[0].next_reading_in > 0) {
+            console.log(`🚀 Iniciando con next_reading_in: ${res[0].next_reading_in}s`);
+            this.iniciarContadorDesdeDato(res[0].next_reading_in);
+          } else {
+            console.warn('⚠️ Dato inicial sin next_reading_in');
+          }
         }
       },
       error: (err) => {
