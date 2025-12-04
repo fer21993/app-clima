@@ -1,5 +1,6 @@
 <div class="min-h-screen bg-blue-100 flex items-center justify-center p-4">
   <div class="bg-white rounded-2xl shadow-lg p-6 w-full max-w-sm">
+    
     <div class="flex justify-center mb-6">
       <div class="bg-purple-200 p-3 rounded-full">
         <svg class="w-8 h-8 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -11,14 +12,20 @@
     <h1 class="text-3xl font-bold text-center text-purple-600 mb-2">AppClima</h1>
     <p class="text-center text-gray-400 mb-8 text-sm">Tu app de clima</p>
 
-    <div class="space-y-4">
+    <div *ngIf="errorMessage" class="mb-4 p-3 bg-red-100 border border-red-300 text-red-700 rounded-lg text-sm">
+      {{ errorMessage }}
+    </div>
+
+    <form (ngSubmit)="login()" class="space-y-4">
       <div>
         <label class="block text-sm font-medium text-gray-600 mb-2">Email</label>
         <input
           type="email"
           [(ngModel)]="email"
+          name="email"
           class="w-full px-4 py-2 border border-purple-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-300 bg-purple-50"
           placeholder="tu@email.com"
+          [disabled]="isLoading"
         />
       </div>
 
@@ -27,17 +34,41 @@
         <input
           type="password"
           [(ngModel)]="password"
+          name="password"
           class="w-full px-4 py-2 border border-purple-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-300 bg-purple-50"
           placeholder="••••••••"
+          [disabled]="isLoading"
         />
       </div>
 
       <button
-        (click)="login()"
-        class="w-full bg-purple-300 text-purple-800 font-semibold py-2 rounded-lg hover:bg-purple-400 transition"
+        type="submit"
+        [disabled]="isLoading"
+        class="w-full bg-purple-300 text-purple-800 font-semibold py-2 rounded-lg hover:bg-purple-400 transition disabled:opacity-50"
       >
-        Ingresar
+        <span *ngIf="!isLoading">Ingresar</span>
+        <span *ngIf="isLoading">Ingresando...</span>
       </button>
+    </form>
+
+    <div class="mt-6 pt-6 border-t border-gray-200">
+      <p class="text-xs text-gray-500 text-center mb-3">Usuarios de prueba:</p>
+      <div class="space-y-2">
+        <button
+          type="button"
+          (click)="fillDemo('admin')"
+          class="w-full text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 px-3 rounded transition text-left"
+        >
+          👤 <strong>Admin:</strong> fernanda@appclima.com / fernanda123
+        </button>
+        <button
+          type="button"
+          (click)="fillDemo('user')"
+          class="w-full text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 px-3 rounded transition text-left"
+        >
+          👤 <strong>Usuario:</strong> usuario@appclima.com / usuario123
+        </button>
+      </div>
     </div>
   </div>
 </div>

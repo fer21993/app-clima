@@ -1,0 +1,184 @@
+<!-- dashboard.component.html -->
+<div class="dashboard">
+  
+  <!-- Header -->
+  <div class="header">
+    <div class="header-left">
+      <h1>Dashboard ESP32</h1>
+      <p>Monitoreo en Tiempo Real</p>
+    </div>
+    <div class="header-right">
+      <span class="user" *ngIf="usuario">{{ usuario.fullname }}</span>
+      <p-button 
+        icon="pi pi-sign-out" 
+        severity="secondary"
+        [outlined]="true"
+        (onClick)="cerrarSesion()"
+        pTooltip="Cerrar Sesión">
+      </p-button>
+    </div>
+  </div>
+
+  <!-- Status Bar -->
+  <div class="status">
+    <p-tag 
+      [value]="online ? 'ONLINE' : 'OFFLINE'" 
+      [severity]="online ? 'success' : 'danger'"
+      [icon]="online ? 'pi pi-check' : 'pi pi-times'">
+    </p-tag>
+    <span class="last-update">
+      <i class="pi pi-clock"></i>
+      {{ ultimaActualizacion }}
+    </span>
+  </div>
+
+  <!-- Main Cards -->
+  <div class="cards">
+    
+    <!-- Temperatura -->
+    <div class="card temperatura">
+      <div class="card-icon">
+        <i class="pi pi-sun"></i>
+      </div>
+      <div class="card-content">
+        <span class="label">Temperatura</span>
+        <span class="value">{{ temperatura.toFixed(1) }}<small>°C</small></span>
+        <div class="stats">
+          <div class="stat">
+            <span>Promedio</span>
+            <strong>{{ promedioTemp.toFixed(1) }}°C</strong>
+          </div>
+          <div class="stat">
+            <span>Máxima</span>
+            <strong>{{ maxTemp.toFixed(1) }}°C</strong>
+          </div>
+          <div class="stat">
+            <span>Mínima</span>
+            <strong>{{ minTemp.toFixed(1) }}°C</strong>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Humedad -->
+    <div class="card humedad">
+      <div class="card-icon">
+        <img src="https://cdn-icons-png.flaticon.com/512/31/31823.png" alt="gota">
+      </div>
+      <div class="card-content">
+        <span class="label">Humedad</span>
+        <span class="value">{{ humedad.toFixed(1) }}<small>%</small></span>
+        <div class="progress-bar">
+          <div class="progress" [style.width.%]="humedad"></div>
+        </div>
+        <div class="stats">
+          <div class="stat">
+            <span>Promedio</span>
+            <strong>{{ promedioHum.toFixed(1) }}%</strong>
+          </div>
+          <div class="stat">
+            <span>Estado</span>
+            <strong [class.ok]="humedad >= 40 && humedad <= 60">
+              {{ (humedad >= 40 && humedad <= 60) ? 'Óptimo' : 'Regular' }}
+            </strong>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sistema -->
+    <div class="card sistema">
+      <div class="card-icon">
+        <i class="pi pi-microchip"></i>
+      </div>
+      <div class="card-content">
+        <span class="label">Sistema</span>
+        <div class="info-list">
+          <div class="info-item">
+            <i class="pi pi-server"></i>
+            <div>
+              <span>Dispositivo</span>
+              <strong>{{ device }}</strong>
+            </div>
+          </div>
+          <div class="info-item">
+            <i class="pi pi-bolt"></i>
+            <div>
+              <span>Voltaje</span>
+              <strong>{{ voltaje }}V</strong>
+            </div>
+          </div>
+          <div class="info-item">
+            <i class="pi pi-database"></i>
+            <div>
+              <span>Lecturas</span>
+              <strong>{{ totalLecturas }}</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Botón Histórico -->
+  <div class="actions">
+    <p-button 
+      label="Ver Histórico Completo" 
+      icon="pi pi-list"
+      styleClass="p-button-lg"
+      (onClick)="verHistorico()">
+    </p-button>
+  </div>
+
+</div>
+
+<!-- Dialog Histórico -->
+<p-dialog 
+  [(visible)]="mostrarHistorico"
+  header="Histórico de Lecturas"
+  [modal]="true"
+  [style]="{width: '90vw', maxWidth: '1100px'}"
+  [dismissableMask]="true">
+  
+  <p-table 
+    [value]="historico"
+    [paginator]="true"
+    [rows]="15"
+    [rowsPerPageOptions]="[15, 25, 50]"
+    styleClass="p-datatable-sm p-datatable-striped">
+    
+    <ng-template pTemplate="header">
+      <tr>
+        <th>Temperatura</th>
+        <th>Humedad</th>
+        <th>Voltaje</th>
+        <th>Fecha y Hora</th>
+      </tr>
+    </ng-template>
+    
+    <ng-template pTemplate="body" let-dato>
+      <tr>
+        <td>
+          <i class="pi pi-sun" style="color: #f59e0b"></i>
+          {{ dato.temperature?.toFixed(1) }}°C
+        </td>
+        <td>
+          <i class="pi pi-tint" style="color: #3b82f6"></i>
+          {{ dato.humidity?.toFixed(1) }}%
+        </td>
+        <td>{{ dato.voltage?.toFixed(2) }}V</td>
+        <td style="font-size: 0.85rem; color: #666;">{{ dato.timestamp }}</td>
+      </tr>
+    </ng-template>
+  </p-table>
+
+  <ng-template pTemplate="footer">
+    <p-button 
+      label="Cerrar" 
+      icon="pi pi-times"
+      (onClick)="cerrarHistorico()">
+    </p-button>
+  </ng-template>
+</p-dialog>
+
+<p-toast position="top-right"></p-toast>
