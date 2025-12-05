@@ -1,4 +1,4 @@
-// dashboard.component.ts
+// dashboard.component.ts - VERSIÓN FINAL COMPLETA
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { MessageService } from 'primeng/api';
@@ -72,6 +72,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
   private countdownInterval: any;
   private timestampInicio: number = 0;
   
+  // 🆕 Control de timeout para detectar offline
+  private timeoutDeteccion: any;
+  private TIMEOUT_OFFLINE = 65000; // 65 segundos sin datos = OFFLINE
+  
   private apiUrl = 'https://servidor-esp.onrender.com/api/data';
   private statsUrl = 'https://servidor-esp.onrender.com/api/stats';
 
@@ -104,6 +108,34 @@ export class DashboardComponent implements OnInit, OnDestroy {
     if (this.countdownInterval) {
       clearInterval(this.countdownInterval);
     }
+    if (this.timeoutDeteccion) {
+      clearTimeout(this.timeoutDeteccion);
+    }
+  }
+
+  // 🆕 Reiniciar el timeout de detección de offline
+  reiniciarTimeoutOffline() {
+    // Limpiar timeout anterior
+    if (this.timeoutDeteccion) {
+      clearTimeout(this.timeoutDeteccion);
+    }
+    
+    // Marcar como ONLINE
+    this.online = true;
+    
+    // Configurar nuevo timeout
+    this.timeoutDeteccion = setTimeout(() => {
+      console.log('⚠️ No hay datos nuevos hace 90s - marcando OFFLINE');
+      this.online = false;
+      this.nextReadingIn = 0;
+      
+      this.messageService.add({
+        severity: 'warn',
+        summary: 'Dispositivo Desconectado',
+        detail: 'No se han recibido datos en los últimos 90 segundos',
+        life: 5000
+      });
+    }, this.TIMEOUT_OFFLINE);
   }
 
   // Iniciar contador con el valor que viene del ESP32
@@ -175,13 +207,15 @@ export class DashboardComponent implements OnInit, OnDestroy {
             this.actualizarDatos(res);
             this.cargarEstadisticas();
             
+            // 🆕 Reiniciar timeout de offline
+            this.reiniciarTimeoutOffline();
+            
             // SINCRONIZAR contador con el valor que envió el ESP32
             if (ultimoDato.next_reading_in !== undefined && ultimoDato.next_reading_in !== null && ultimoDato.next_reading_in > 0) {
               console.log(`✅ ESP32 envió next_reading_in: ${ultimoDato.next_reading_in}s`);
               this.iniciarContadorDesdeDato(ultimoDato.next_reading_in);
             } else {
               console.warn('⚠️ ESP32 NO envió next_reading_in válido:', ultimoDato.next_reading_in);
-              console.warn('🔍 Claves del objeto:', Object.keys(ultimoDato));
               // Fallback: usar 30s por defecto
               this.iniciarContadorDesdeDato(30);
             }
@@ -212,6 +246,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
           this.ultimoTimestamp = res[0].timestamp;
           this.actualizarDatos(res);
           
+          // 🆕 Iniciar timeout de offline
+          this.reiniciarTimeoutOffline();
+          
           // Iniciar contador con el último dato guardado
           if (res[0].next_reading_in && res[0].next_reading_in > 0) {
             console.log(`🚀 Iniciando con next_reading_in: ${res[0].next_reading_in}s`);
@@ -240,13 +277,11 @@ export class DashboardComponent implements OnInit, OnDestroy {
         this.temperatura = ultimoValido.temperature;
         this.humedad = ultimoValido.humidity;
         this.voltaje = ultimoValido.voltage.toFixed(2);
-        this.online = false;
       }
     } else {
       this.temperatura = ultimo.temperature;
       this.humedad = ultimo.humidity;
       this.voltaje = ultimo.voltage.toFixed(2);
-      this.online = true;
     }
     
     this.ultimaActualizacion = this.formatearFecha(ultimo.timestamp);
